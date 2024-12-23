@@ -1,38 +1,37 @@
 import os
-import shutil
-import tempfile
+os.environ["TOKENIZERS_PARALLELISM"] = "false"  # Prevent tokenizer parallelism warning
 import streamlit as st
 from typing import List, Dict, Any
 from dataclasses import dataclass
 from pathlib import Path
 import logging
 from datetime import datetime
-from langchain.document_loaders import PyPDFLoader
+from langchain_community.document_loaders import PyPDFLoader
 from langchain_openai import OpenAIEmbeddings
-from langchain.vectorstores import FAISS
+from langchain_community.vectorstores import FAISS
 from langchain.chains import RetrievalQA
-from langchain.chat_models import ChatOpenAI
+from langchain_openai import ChatOpenAI
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.agents import Tool, AgentExecutor, ConversationalAgent
+from langchain.agents import Tool, AgentExecutor
 from langchain.memory import ConversationBufferMemory
-from langchain.schema import Document
-from langchain.callbacks import StreamlitCallbackHandler
+from langchain.schema import Document, HumanMessage, AIMessage, SystemMessage
+from langchain_community.callbacks import StreamlitCallbackHandler
 from langchain.prompts import PromptTemplate
+from langchain.agents.openai_functions_agent.base import OpenAIFunctionsAgent
+from langchain.agents.openai_functions_agent.agent_token_buffer_memory import AgentTokenBufferMemory
+from langchain.tools.retriever import create_retriever_tool
 
-# ==========================
-# Configuration
-# ==========================
 @dataclass
 class Config:
     """Application configuration."""
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY")
-    LLM_MODEL: str = "gpt-4o"
-    EMBEDDING_MODEL: str = "text-embedding-ada-002"
+    EMBEDDING_MODEL: str = "text-embedding-3-small"  # OpenAI's embedding model
+    LLM_MODEL: str = "gpt-4o-mini"
     CHUNK_SIZE: int = 1000
     CHUNK_OVERLAP: int = 100
     MAX_RETRIES: int = 3
     TEMPERATURE: float = 0
-    TOP_K_RESULTS: int = 30
+    TOP_K_RESULTS: int = 15
     LOG_FILE: str = "app.log"
 
 # Initialize logging
@@ -42,44 +41,22 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-# ==========================
-# Enhanced Prompts
-# ==========================
 class Prompts:
     """Collection of system prompts."""
     
-    QA_PROMPT = """You are a specialized airport tariff analysis assistant. Your role is to provide precise information from airport tariff documents.
+    SYSTEM_PROMPT = SystemMessage(
+        content="""You are an expert airport tariff analyst. Your role is to provide precise information from airport tariff documents.
 
 IMPORTANT RULES:
-1. ONLY use information from the provided context. DO NOT use external knowledge.
-2. If information isn't in the context, respond with:
+1. You MUST use the provided retriever tool to access information for every query.
+2. Only use information from the provided context. DO NOT use external knowledge.
+3. If information isn't found, respond with:
    "I apologize, but I cannot find this specific information in the provided tariff documents."
-3. For each piece of information, cite the specific airport, document section, and page number.
-4. Present monetary values in their original currency with clear labeling.
-5. When comparing airports, use tables with clear headers.
+4. For each piece of information, cite the specific airport and document section.
+5. Present monetary values in their original currency with clear labeling.
+6. When comparing airports, use tables with clear headers."""
+    )
 
-Context: {context}
-
-Question: {question}
-
-Response: Analyzing the tariff documents..."""
-
-    AGENT_SYSTEM_PROMPT = """You are an expert airport tariff analyst with capabilities to:
-1. Compare tariff structures across different airports
-2. Break down complex fee calculations
-3. Explain regulatory compliance aspects
-4. Analyze historical tariff trends
-
-Guidelines:
-1. Always show detailed fee breakdowns
-2. Include relevant terms and conditions
-3. Highlight any seasonal variations
-4. Note applicable GST/tax implications
-"""
-
-# ==========================
-# Document Processing
-# ==========================
 class DocumentProcessor:
     """Handles document loading and processing."""
     
@@ -89,12 +66,22 @@ class DocumentProcessor:
             chunk_size=config.CHUNK_SIZE,
             chunk_overlap=config.CHUNK_OVERLAP
         )
+        # Create uploads directory if it doesn't exist
+        self.uploads_dir = Path("uploads")
+        self.uploads_dir.mkdir(exist_ok=True)
+
+    def save_uploaded_file(self, uploaded_file) -> Path:
+        """Save an uploaded file and return its path."""
+        file_path = self.uploads_dir / uploaded_file.name
+        if not file_path.exists():  # Only save if file doesn't exist
+            with open(file_path, "wb") as f:
+                f.write(uploaded_file.getvalue())
+            logging.info(f"Saved new file: {file_path}")
+        return file_path
 
     @st.cache_data
     def load_documents(_self, pdf_paths: List[str]) -> List[Document]:
-        """Load and process PDF documents with enhanced error handling.
-        
-        Note: Using _self parameter for Streamlit caching compatibility."""
+        """Load and process PDF documents with enhanced error handling."""
         docs = []
         for path in pdf_paths:
             try:
@@ -129,58 +116,31 @@ class DocumentProcessor:
             
         return docs
 
-# ==========================
-# Vector Store Management
-# ==========================
 class VectorStoreManager:
     """Manages vector store operations."""
     
     def __init__(self, config: Config):
         self.config = config
-        self.embeddings = OpenAIEmbeddings(
-            model=config.EMBEDDING_MODEL,
-            openai_api_key=config.OPENAI_API_KEY
-        )
+        try:
+            self.embeddings = OpenAIEmbeddings(
+                model=self.config.EMBEDDING_MODEL,
+                openai_api_key=config.OPENAI_API_KEY
+            )
+        except Exception as e:
+            logging.error(f"Error initializing embeddings: {str(e)}")
+            raise
 
     @st.cache_resource
     def create_vectorstore(_self, _docs: List[Document]) -> FAISS:
-        """Create and configure FAISS vector store.
-        
-        Note: Using underscore prefix for parameters to skip Streamlit hashing."""
+        """Create and configure FAISS vector store."""
         return FAISS.from_documents(_docs, _self.embeddings)
-
-    def create_retriever(self, vectorstore: FAISS):
-        """Configure retriever with optimal parameters."""
-        return vectorstore.as_retriever(
-            search_type="similarity_score_threshold",
-            search_kwargs={
-                "k": self.config.TOP_K_RESULTS,
-                "score_threshold": 0.7
-            }
-        )
-    
-
-def airport_tariff_qa_func(qa_chain, query: str) -> str:
-    """
-    Calls the QA chain, which returns { 'result': ..., 'source_documents': [...] }.
-    Returns only the 'result' key so that the Agent does not break on multiple outputs.
-    """
-    raw_output = qa_chain({"query": query})
-    # raw_output["source_documents"] -> list of Documents retrieved
-    return raw_output["result"]
-
-
-# ==========================
-# Agent System
-# ==========================
-from langchain.prompts import PromptTemplate
 
 class AgentSystem:
     """Manages the QA agent system."""
     
-    def __init__(self, config: Config, retriever):
+    def __init__(self, config: Config, vectorstore: FAISS):
         self.config = config
-        self.retriever = retriever
+        self.vectorstore = vectorstore
         self.llm = ChatOpenAI(
             openai_api_key=config.OPENAI_API_KEY,
             model=config.LLM_MODEL,
@@ -188,68 +148,62 @@ class AgentSystem:
             streaming=True
         )
 
-    def build_qa_chain(self):
-        """Create the QA chain with improved configuration."""
-        
-        # Create a PromptTemplate from your QA_PROMPT text
-        qa_prompt_template = PromptTemplate(
-            input_variables=["context", "question"],
-            template=Prompts.QA_PROMPT
-        )
-        
-        # Set return_source_documents=True to see which documents were used
-        return RetrievalQA.from_chain_type(
-            llm=self.llm,
-            chain_type="stuff",
-            retriever=self.retriever,
-            return_source_documents=True,
-            chain_type_kwargs={
-                "prompt": qa_prompt_template
-            }
-        )
-
     def create_agent(self):
-        """Create the conversational agent with enhanced capabilities."""
-        qa_chain = self.build_qa_chain()
+        """Create the agent with enhanced capabilities."""
+        # Create a retriever tool using the vectorstore
+        retriever = self.vectorstore.as_retriever(
+            search_kwargs={"k": self.config.TOP_K_RESULTS}
+        )
         
-        # Use the custom function as the Tool
-        tools = [
-            Tool(
-                name="AirportTariffQA",
-                func=lambda query: airport_tariff_qa_func(qa_chain, query),
-                description="Answers questions about airport tariffs using the provided documents.",
-                return_direct=True
-            )
-        ]
-
-        memory = ConversationBufferMemory(
-            memory_key="chat_history",
-            return_messages=True,
-            output_key="output"
+        # Create the retriever tool with more specific description
+        retriever_tool = create_retriever_tool(
+            retriever,
+            name="search_tariffs",
+            description="""Use this tool to search through airport tariff documents. 
+            Always use this tool first to find relevant information before providing an answer.
+            The tool will return the most relevant passages from the tariff documents."""
         )
 
-        # System message from your prompts
-        system_message = Prompts.AGENT_SYSTEM_PROMPT
+        tools = [retriever_tool]
 
-        agent = ConversationalAgent.from_llm_and_tools(
+        # Initialize memory with token limit
+        memory = AgentTokenBufferMemory(
+            memory_key="chat_history",
+            llm=self.llm,
+            max_token_limit=2000,
+            return_messages=True
+        )
+
+        # Create the agent with more specific instructions
+        prompt = SystemMessage(content="""You are an expert airport tariff analyst. Your role is to provide precise information from airport tariff documents.
+
+IMPORTANT RULES:
+1. ALWAYS use the search_tariffs tool first to find relevant information before answering.
+2. Only use information found in the tariff documents. DO NOT make assumptions or use external knowledge.
+3. If the search tool doesn't return relevant information, say: "I apologize, but I cannot find this specific information in the provided tariff documents."
+4. Always cite your sources by mentioning the specific airport, document section, and page number.
+5. For monetary values, include the original currency and clear labeling.
+6. When comparing airports, present information in a clear, structured format.
+7. If the search results are unclear or seem incomplete, perform another search with different keywords.""")
+
+        agent = OpenAIFunctionsAgent.from_llm_and_tools(
             llm=self.llm,
             tools=tools,
-            verbose=True,
-            system_message=system_message
+            system_message=prompt
         )
 
-        return AgentExecutor.from_agent_and_tools(
+        executor = AgentExecutor.from_agent_and_tools(
             agent=agent,
             tools=tools,
-            verbose=True,
             memory=memory,
-            handle_parsing_errors=True
+            handle_parsing_errors=True,
+            max_iterations=3,
+            verbose=True,
+            return_intermediate_steps=True  # Enable intermediate steps
         )
+        
+        return executor
 
-
-# ==========================
-# Streamlit UI
-# ==========================
 class UI:
     """Manages the Streamlit user interface."""
     
@@ -272,7 +226,6 @@ class UI:
         - Regulatory compliance
         """)
 
-        # Sidebar for configuration
         with st.sidebar:
             st.header("Configuration")
             uploaded_files = st.file_uploader(
@@ -306,33 +259,29 @@ def main():
             return
 
         with st.spinner("Processing documents..."):
-            # Save uploaded files to temporary location
-            temp_dir = Path("temp_pdfs")
-            temp_dir.mkdir(exist_ok=True)
-            
-            temp_paths = []
-            for uploaded_file in uploaded_files:
-                temp_path = temp_dir / uploaded_file.name
-                with open(temp_path, "wb") as f:
-                    f.write(uploaded_file.getvalue())
-                temp_paths.append(temp_path)
-            
             doc_processor = DocumentProcessor(config)
-            docs = doc_processor.load_documents([str(path) for path in temp_paths])
+            
+            # Save uploaded files persistently
+            saved_paths = []
+            for uploaded_file in uploaded_files:
+                file_path = doc_processor.save_uploaded_file(uploaded_file)
+                saved_paths.append(str(file_path))
+            
+            # Load and process documents
+            docs = doc_processor.load_documents(saved_paths)
 
             vector_manager = VectorStoreManager(config)
             vectorstore = vector_manager.create_vectorstore(docs)
             
-            # Cleanup temporary files
-            for path in temp_paths:
-                path.unlink(missing_ok=True)
-            temp_dir.rmdir()
-            retriever = vector_manager.create_retriever(vectorstore)
-
-            agent_system = AgentSystem(config, retriever)
+            agent_system = AgentSystem(config, vectorstore)
             agent_chain = agent_system.create_agent()
 
-        # Query interface
+        # Display already processed files
+        if saved_paths:
+            st.sidebar.markdown("### Processed Documents")
+            for path in saved_paths:
+                st.sidebar.text(Path(path).name)
+
         query = st.text_input("What would you like to know about the airport tariffs?")
         
         if st.button("Analyze", type="primary"):
@@ -343,17 +292,40 @@ def main():
             try:
                 with st.spinner("Analyzing tariffs..."):
                     callbacks = [StreamlitCallbackHandler(st.container())]
-                    response = agent_chain.run(
-                        input=query,
-                        callbacks=callbacks
+                    
+                    # Invoke the agent with proper input format and return intermediate steps
+                    response = agent_chain.invoke(
+                        {
+                            "input": query,
+                            "chat_history": []
+                        },
+                        config={
+                            "callbacks": callbacks
+                        }
                     )
                     
                     st.markdown("### Analysis Results")
-                    st.markdown(response)
+                    
+                    # Display intermediate steps if present
+                    # if "intermediate_steps" in response:
+                    #     st.markdown("#### Thought Process:")
+                    #     for step in response["intermediate_steps"]:
+                    #         action = step[0]
+                    #         st.markdown(f"**Tool:** {action.tool}")
+                    #         st.markdown(f"**Input:** {action.tool_input}")
+                    #         st.markdown(f"**Output:** {step[1]}")
+                    #         st.markdown("---")
+                    
+                    # Display final output
+                    st.markdown("#### Final Response:")
+                    if isinstance(response, dict) and "output" in response:
+                        st.markdown(response["output"])
+                    else:
+                        st.markdown(str(response))
                     
             except Exception as e:
                 logging.error(f"Query processing error: {str(e)}")
-                st.error("An error occurred while processing your query. Please try again.")
+                # st.error("An error occurred while processing your query. Please try again.")
     
     except Exception as e:
         logging.error(f"Application error: {str(e)}")
