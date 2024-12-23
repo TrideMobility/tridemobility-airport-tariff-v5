@@ -1,5 +1,5 @@
 import os
-os.environ["TOKENIZERS_PARALLELISM"] = "false"  # Prevent tokenizer parallelism warning
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 import streamlit as st
 from typing import List, Dict, Any
 from dataclasses import dataclass
@@ -25,7 +25,7 @@ from langchain.tools.retriever import create_retriever_tool
 class Config:
     """Application configuration."""
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY")
-    EMBEDDING_MODEL: str = "text-embedding-3-small"  # OpenAI's embedding model
+    EMBEDDING_MODEL: str = "text-embedding-3-small"
     LLM_MODEL: str = "gpt-4o-mini"
     CHUNK_SIZE: int = 1000
     CHUNK_OVERLAP: int = 100
@@ -33,6 +33,9 @@ class Config:
     TEMPERATURE: float = 0
     TOP_K_RESULTS: int = 15
     LOG_FILE: str = "app.log"
+    DATA_DIR: str = "data"  # Directory for PDF files
+    VECTORSTORE_DIR: str = "vectorstore"  # Directory for storing vectorstore
+    LAST_UPDATE_FILE: str = "last_update.txt"  # File to track last update time
 
 # Initialize logging
 logging.basicConfig(
@@ -40,22 +43,6 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
-
-class Prompts:
-    """Collection of system prompts."""
-    
-    SYSTEM_PROMPT = SystemMessage(
-        content="""You are an expert airport tariff analyst. Your role is to provide precise information from airport tariff documents.
-
-IMPORTANT RULES:
-1. You MUST use the provided retriever tool to access information for every query.
-2. Only use information from the provided context. DO NOT use external knowledge.
-3. If information isn't found, respond with:
-   "I apologize, but I cannot find this specific information in the provided tariff documents."
-4. For each piece of information, cite the specific airport and document section.
-5. Present monetary values in their original currency with clear labeling.
-6. When comparing airports, use tables with clear headers."""
-    )
 
 class DocumentProcessor:
     """Handles document loading and processing."""
@@ -66,22 +53,20 @@ class DocumentProcessor:
             chunk_size=config.CHUNK_SIZE,
             chunk_overlap=config.CHUNK_OVERLAP
         )
-        # Create uploads directory if it doesn't exist
-        self.uploads_dir = Path("uploads")
-        self.uploads_dir.mkdir(exist_ok=True)
+        # Ensure data directory exists
+        self.data_dir = Path(config.DATA_DIR)
+        self.data_dir.mkdir(exist_ok=True)
 
-    def save_uploaded_file(self, uploaded_file) -> Path:
-        """Save an uploaded file and return its path."""
-        file_path = self.uploads_dir / uploaded_file.name
-        if not file_path.exists():  # Only save if file doesn't exist
-            with open(file_path, "wb") as f:
-                f.write(uploaded_file.getvalue())
-            logging.info(f"Saved new file: {file_path}")
-        return file_path
+    def get_pdf_files(self) -> List[str]:
+        """Get all PDF files from the data directory."""
+        return [str(f) for f in self.data_dir.glob("*.pdf")]
 
-    @st.cache_data
-    def load_documents(_self, pdf_paths: List[str]) -> List[Document]:
-        """Load and process PDF documents with enhanced error handling."""
+    def load_documents(self) -> List[Document]:
+        """Load and process PDF documents from the data directory."""
+        pdf_paths = self.get_pdf_files()
+        if not pdf_paths:
+            raise ValueError("No PDF files found in the data directory")
+
         docs = []
         for path in pdf_paths:
             try:
@@ -94,7 +79,7 @@ class DocumentProcessor:
                 airport_name = Path(path).stem.split('_')[0].capitalize()
                 
                 for doc in pdf_docs:
-                    chunks = _self.text_splitter.split_text(doc.page_content)
+                    chunks = self.text_splitter.split_text(doc.page_content)
                     for chunk in chunks:
                         metadata = {
                             "source": path,
@@ -121,6 +106,10 @@ class VectorStoreManager:
     
     def __init__(self, config: Config):
         self.config = config
+        self.vectorstore_path = Path(config.VECTORSTORE_DIR)
+        self.vectorstore_path.mkdir(exist_ok=True)
+        self.last_update_file = Path(config.VECTORSTORE_DIR) / config.LAST_UPDATE_FILE
+        
         try:
             self.embeddings = OpenAIEmbeddings(
                 model=self.config.EMBEDDING_MODEL,
@@ -130,10 +119,72 @@ class VectorStoreManager:
             logging.error(f"Error initializing embeddings: {str(e)}")
             raise
 
-    @st.cache_resource
-    def create_vectorstore(_self, _docs: List[Document]) -> FAISS:
-        """Create and configure FAISS vector store."""
-        return FAISS.from_documents(_docs, _self.embeddings)
+    def get_data_files_hash(self) -> str:
+        """Get a hash of all PDF files in the data directory."""
+        import hashlib
+        data_dir = Path(self.config.DATA_DIR)
+        if not data_dir.exists():
+            return ""
+        
+        pdf_files = sorted(data_dir.glob("*.pdf"))
+        hash_content = []
+        for pdf_file in pdf_files:
+            hash_content.extend([
+                pdf_file.name,
+                str(pdf_file.stat().st_mtime_ns)
+            ])
+        return hashlib.md5("|".join(hash_content).encode()).hexdigest()
+
+    def should_rebuild_vectorstore(self) -> bool:
+        """Check if vectorstore needs to be rebuilt."""
+        if not list(self.vectorstore_path.glob("*.faiss")):
+            return True
+            
+        if not self.last_update_file.exists():
+            return True
+            
+        current_hash = self.get_data_files_hash()
+        stored_hash = self.last_update_file.read_text().strip() if self.last_update_file.exists() else ""
+        
+        return current_hash != stored_hash
+
+    def save_vectorstore(self, vectorstore: FAISS):
+        """Save vectorstore and update hash."""
+        vectorstore.save_local(str(self.vectorstore_path))
+        self.last_update_file.write_text(self.get_data_files_hash())
+        logging.info("Vectorstore saved successfully")
+
+    def load_vectorstore(self) -> FAISS:
+        """Load existing vectorstore."""
+        return FAISS.load_local(str(self.vectorstore_path), self.embeddings)
+
+    def create_vectorstore(self, docs: List[Document]) -> FAISS:
+        """Create new FAISS vector store."""
+        vectorstore = FAISS.from_documents(docs, self.embeddings)
+        self.save_vectorstore(vectorstore)
+        return vectorstore
+
+@st.cache_resource
+def get_vectorstore(config: Config) -> FAISS:
+    """Get or create vectorstore."""
+    vector_manager = VectorStoreManager(config)
+    
+    try:
+        if vector_manager.should_rebuild_vectorstore():
+            logging.info("Building new vectorstore...")
+            doc_processor = DocumentProcessor(config)
+            docs = doc_processor.load_documents()
+            vectorstore = vector_manager.create_vectorstore(docs)
+            logging.info("New vectorstore created and saved")
+        else:
+            logging.info("Loading existing vectorstore...")
+            vectorstore = vector_manager.load_vectorstore()
+            logging.info("Existing vectorstore loaded")
+        
+        return vectorstore
+    except Exception as e:
+        logging.error(f"Error with vectorstore: {str(e)}")
+        raise
 
 class AgentSystem:
     """Manages the QA agent system."""
@@ -192,22 +243,20 @@ IMPORTANT RULES:
             system_message=prompt
         )
 
-        executor = AgentExecutor.from_agent_and_tools(
+        return AgentExecutor.from_agent_and_tools(
             agent=agent,
             tools=tools,
             memory=memory,
             handle_parsing_errors=True,
             max_iterations=3,
-            verbose=True,
-            return_intermediate_steps=True  # Enable intermediate steps
+            verbose=True
         )
-        
-        return executor
-
+    
 class UI:
     """Manages the Streamlit user interface."""
     
-    def __init__(self):
+    def __init__(self, config: Config):
+        self.config = config
         st.set_page_config(
             page_title="Airport Tariff Analysis System",
             page_icon="✈️",
@@ -219,7 +268,7 @@ class UI:
         st.title("✈️ Airport Tariff Analysis System")
         st.markdown("""
         ### Compare and analyze tariffs across different airports
-        Upload PDF documents containing airport tariffs and ask questions to analyze:
+        System automatically processes PDF documents from the data directory to analyze:
         - Fee structures and calculations
         - Cross-airport comparisons
         - Seasonal variations
@@ -227,12 +276,15 @@ class UI:
         """)
 
         with st.sidebar:
-            st.header("Configuration")
-            uploaded_files = st.file_uploader(
-                "Upload Tariff Documents",
-                type="pdf",
-                accept_multiple_files=True
-            )
+            st.header("Available Documents")
+            # Display PDF files from data directory
+            pdf_files = DocumentProcessor(self.config).get_pdf_files()
+            if pdf_files:
+                st.markdown("### Processed Documents")
+                for path in pdf_files:
+                    st.text(Path(path).name)
+            else:
+                st.warning("No PDF files found in data directory")
             
             st.markdown("### Sample Questions")
             st.markdown("""
@@ -240,8 +292,6 @@ class UI:
             - Compare parking charges between airports
             - What are the peak hour surcharges?
             """)
-
-        return uploaded_files
 
 def main():
     """Main application entry point."""
@@ -251,36 +301,23 @@ def main():
             st.error("OpenAI API key not found. Please set the OPENAI_API_KEY environment variable.")
             st.stop()
 
-        ui = UI()
-        uploaded_files = ui.render()
+        ui = UI(config)
+        ui.render()
 
-        if not uploaded_files:
-            st.info("Please upload PDF documents to begin analysis.")
+        # Get or create vectorstore (cached for the session)
+        try:
+            vectorstore = get_vectorstore(config)
+        except ValueError as e:
+            st.error(str(e))
+            st.info("Please add PDF files to the 'data' directory and restart the application.")
+            return
+        except Exception as e:
+            st.error(f"Error initializing the system: {str(e)}")
             return
 
-        with st.spinner("Processing documents..."):
-            doc_processor = DocumentProcessor(config)
-            
-            # Save uploaded files persistently
-            saved_paths = []
-            for uploaded_file in uploaded_files:
-                file_path = doc_processor.save_uploaded_file(uploaded_file)
-                saved_paths.append(str(file_path))
-            
-            # Load and process documents
-            docs = doc_processor.load_documents(saved_paths)
-
-            vector_manager = VectorStoreManager(config)
-            vectorstore = vector_manager.create_vectorstore(docs)
-            
-            agent_system = AgentSystem(config, vectorstore)
-            agent_chain = agent_system.create_agent()
-
-        # Display already processed files
-        if saved_paths:
-            st.sidebar.markdown("### Processed Documents")
-            for path in saved_paths:
-                st.sidebar.text(Path(path).name)
+        # Initialize agent system
+        agent_system = AgentSystem(config, vectorstore)
+        agent_chain = agent_system.create_agent()
 
         query = st.text_input("What would you like to know about the airport tariffs?")
         
@@ -292,8 +329,6 @@ def main():
             try:
                 with st.spinner("Analyzing tariffs..."):
                     callbacks = [StreamlitCallbackHandler(st.container())]
-                    
-                    # Invoke the agent with proper input format and return intermediate steps
                     response = agent_chain.invoke(
                         {
                             "input": query,
@@ -305,18 +340,6 @@ def main():
                     )
                     
                     st.markdown("### Analysis Results")
-                    
-                    # Display intermediate steps if present
-                    # if "intermediate_steps" in response:
-                    #     st.markdown("#### Thought Process:")
-                    #     for step in response["intermediate_steps"]:
-                    #         action = step[0]
-                    #         st.markdown(f"**Tool:** {action.tool}")
-                    #         st.markdown(f"**Input:** {action.tool_input}")
-                    #         st.markdown(f"**Output:** {step[1]}")
-                    #         st.markdown("---")
-                    
-                    # Display final output
                     st.markdown("#### Final Response:")
                     if isinstance(response, dict) and "output" in response:
                         st.markdown(response["output"])
