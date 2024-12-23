@@ -26,13 +26,13 @@ from langchain.prompts import PromptTemplate
 class Config:
     """Application configuration."""
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY")
-    LLM_MODEL: str = "gpt-4o-mini"
+    LLM_MODEL: str = "gpt-4o"
     EMBEDDING_MODEL: str = "text-embedding-ada-002"
     CHUNK_SIZE: int = 1000
     CHUNK_OVERLAP: int = 100
     MAX_RETRIES: int = 3
     TEMPERATURE: float = 0
-    TOP_K_RESULTS: int = 10
+    TOP_K_RESULTS: int = 30
     LOG_FILE: str = "app.log"
 
 # Initialize logging
