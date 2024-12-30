@@ -1,0 +1,111 @@
+2024-12-29 18:59:34,117 - INFO - Building new vectorstore...
+2024-12-29 19:00:31,396 - INFO - Successfully processed data\bangalore_tariff.pdf: 1 chunks created
+2024-12-29 19:01:33,732 - INFO - Successfully processed data\hyderabad_tariff.pdf: 2 chunks created
+2024-12-29 19:01:40,434 - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2024-12-29 19:01:47,783 - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2024-12-29 19:01:53,979 - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2024-12-29 19:01:55,999 - INFO - Loading faiss with AVX512 support.
+2024-12-29 19:01:56,000 - INFO - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2024-12-29 19:01:56,002 - INFO - Loading faiss with AVX2 support.
+2024-12-29 19:01:56,037 - INFO - Successfully loaded faiss with AVX2 support.
+2024-12-29 19:01:56,462 - INFO - Vectorstore saved successfully
+2024-12-29 19:01:56,463 - INFO - New vectorstore created and saved
+2024-12-29 19:17:10,888 - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2024-12-29 19:17:11,699 - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2024-12-29 19:17:13,376 - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2024-12-29 19:17:16,166 - ERROR - Query processing error: 'intermediate_steps'
+2024-12-30 15:26:38,585 - INFO - Loading existing vectorstore...
+2024-12-30 15:26:38,621 - ERROR - Error with vectorstore: The de-serialization relies loading a pickle file. Pickle files can be modified to deliver a malicious payload that results in execution of arbitrary code on your machine.You will need to set `allow_dangerous_deserialization` to `True` to enable deserialization. If you do this, make sure that you trust the source of the data. For example, if you are loading a file that you created, and know that no one else has modified the file, then this is safe to do. Do not set this to `True` if you are loading a file from an untrusted source (e.g., some random site on the internet.).
+2024-12-30 15:33:44,284 - INFO - Loading existing vectorstore...
+2024-12-30 15:33:44,285 - ERROR - Error with vectorstore: The de-serialization relies loading a pickle file. Pickle files can be modified to deliver a malicious payload that results in execution of arbitrary code on your machine.You will need to set `allow_dangerous_deserialization` to `True` to enable deserialization. If you do this, make sure that you trust the source of the data. For example, if you are loading a file that you created, and know that no one else has modified the file, then this is safe to do. Do not set this to `True` if you are loading a file from an untrusted source (e.g., some random site on the internet.).
+2024-12-30 15:47:37,093 - ERROR - Application error: Unrecognized config option: ui.hide_menu
+2024-12-30 15:49:16,677 - INFO - Loading existing vectorstore...
+2024-12-30 15:49:16,799 - INFO - Loading faiss with AVX512 support.
+2024-12-30 15:49:16,799 - INFO - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2024-12-30 15:49:16,799 - INFO - Loading faiss with AVX2 support.
+2024-12-30 15:49:18,596 - INFO - Successfully loaded faiss with AVX2 support.
+2024-12-30 15:49:19,029 - INFO - Existing vectorstore loaded
+2024-12-30 15:49:38,663 - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2024-12-30 15:49:40,404 - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2024-12-30 15:49:41,633 - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2024-12-30 15:49:45,906 - ERROR - Query processing error: 'intermediate_steps'
+2024-12-30 16:15:08,955 - INFO - Loading existing vectorstore...
+2024-12-30 16:15:08,987 - INFO - Loading faiss with AVX512 support.
+2024-12-30 16:15:08,987 - INFO - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2024-12-30 16:15:08,991 - INFO - Loading faiss with AVX2 support.
+2024-12-30 16:15:09,820 - INFO - Successfully loaded faiss with AVX2 support.
+2024-12-30 16:15:10,220 - INFO - Existing vectorstore loaded
+2024-12-30 16:17:36,452 - INFO - Loading existing vectorstore...
+2024-12-30 16:17:36,455 - INFO - Loading faiss with AVX512 support.
+2024-12-30 16:17:36,455 - INFO - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2024-12-30 16:17:36,455 - INFO - Loading faiss with AVX2 support.
+2024-12-30 16:17:36,639 - INFO - Successfully loaded faiss with AVX2 support.
+2024-12-30 16:17:36,701 - INFO - Existing vectorstore loaded
+2024-12-30 16:18:38,872 - INFO - Loading existing vectorstore...
+2024-12-30 16:18:38,875 - INFO - Loading faiss with AVX512 support.
+2024-12-30 16:18:38,875 - INFO - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2024-12-30 16:18:38,875 - INFO - Loading faiss with AVX2 support.
+2024-12-30 16:18:39,060 - INFO - Successfully loaded faiss with AVX2 support.
+2024-12-30 16:18:39,126 - INFO - Existing vectorstore loaded
+2024-12-30 16:19:24,374 - INFO - Loading existing vectorstore...
+2024-12-30 16:19:24,374 - INFO - Loading faiss with AVX512 support.
+2024-12-30 16:19:24,374 - INFO - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2024-12-30 16:19:24,374 - INFO - Loading faiss with AVX2 support.
+2024-12-30 16:19:24,548 - INFO - Successfully loaded faiss with AVX2 support.
+2024-12-30 16:19:24,628 - INFO - Existing vectorstore loaded
+2024-12-30 16:19:59,097 - INFO - Loading existing vectorstore...
+2024-12-30 16:19:59,104 - INFO - Loading faiss with AVX512 support.
+2024-12-30 16:19:59,105 - INFO - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2024-12-30 16:19:59,105 - INFO - Loading faiss with AVX2 support.
+2024-12-30 16:19:59,284 - INFO - Successfully loaded faiss with AVX2 support.
+2024-12-30 16:19:59,349 - INFO - Existing vectorstore loaded
+2024-12-30 16:24:05,566 - INFO - Loading existing vectorstore...
+2024-12-30 16:24:05,566 - INFO - Loading faiss with AVX512 support.
+2024-12-30 16:24:05,575 - INFO - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2024-12-30 16:24:05,575 - INFO - Loading faiss with AVX2 support.
+2024-12-30 16:24:05,752 - INFO - Successfully loaded faiss with AVX2 support.
+2024-12-30 16:24:05,809 - INFO - Existing vectorstore loaded
+2024-12-30 16:25:14,615 - INFO - Loading existing vectorstore...
+2024-12-30 16:25:14,621 - INFO - Loading faiss with AVX512 support.
+2024-12-30 16:25:14,622 - INFO - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2024-12-30 16:25:14,622 - INFO - Loading faiss with AVX2 support.
+2024-12-30 16:25:14,812 - INFO - Successfully loaded faiss with AVX2 support.
+2024-12-30 16:25:14,878 - INFO - Existing vectorstore loaded
+2024-12-30 16:31:28,372 - INFO - Loading existing vectorstore...
+2024-12-30 16:31:28,381 - INFO - Loading faiss with AVX512 support.
+2024-12-30 16:31:28,381 - INFO - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2024-12-30 16:31:28,381 - INFO - Loading faiss with AVX2 support.
+2024-12-30 16:31:28,589 - INFO - Successfully loaded faiss with AVX2 support.
+2024-12-30 16:31:28,654 - INFO - Existing vectorstore loaded
+2024-12-30 16:31:28,654 - ERROR - Application error: name 'AgentSystem' is not defined
+2024-12-30 16:39:36,865 - INFO - Loading existing vectorstore...
+2024-12-30 16:39:36,867 - INFO - Loading faiss with AVX512 support.
+2024-12-30 16:39:36,867 - INFO - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2024-12-30 16:39:36,867 - INFO - Loading faiss with AVX2 support.
+2024-12-30 16:39:37,062 - INFO - Successfully loaded faiss with AVX2 support.
+2024-12-30 16:39:37,132 - INFO - Existing vectorstore loaded
+2024-12-30 16:40:45,689 - INFO - Loading existing vectorstore...
+2024-12-30 16:40:45,692 - INFO - Loading faiss with AVX512 support.
+2024-12-30 16:40:45,692 - INFO - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2024-12-30 16:40:45,692 - INFO - Loading faiss with AVX2 support.
+2024-12-30 16:40:45,858 - INFO - Successfully loaded faiss with AVX2 support.
+2024-12-30 16:40:45,915 - INFO - Existing vectorstore loaded
+2024-12-30 16:43:16,947 - INFO - Loading existing vectorstore...
+2024-12-30 16:43:16,951 - INFO - Loading faiss with AVX512 support.
+2024-12-30 16:43:16,954 - INFO - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2024-12-30 16:43:16,954 - INFO - Loading faiss with AVX2 support.
+2024-12-30 16:43:17,129 - INFO - Successfully loaded faiss with AVX2 support.
+2024-12-30 16:43:17,210 - INFO - Existing vectorstore loaded

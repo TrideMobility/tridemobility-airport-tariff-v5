@@ -1,6 +1,10 @@
 import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 import streamlit as st
+import streamlit.components.v1 as components
+
+
+
 from typing import List, Dict, Any
 from dataclasses import dataclass
 from pathlib import Path
@@ -156,7 +160,7 @@ class VectorStoreManager:
 
     def load_vectorstore(self) -> FAISS:
         """Load existing vectorstore."""
-        return FAISS.load_local(str(self.vectorstore_path), self.embeddings)
+        return FAISS.load_local(str(self.vectorstore_path), self.embeddings,allow_dangerous_deserialization=True)
 
     def create_vectorstore(self, docs: List[Document]) -> FAISS:
         """Create new FAISS vector store."""
@@ -252,33 +256,60 @@ IMPORTANT RULES:
             verbose=True
         )
     
+
 class UI:
     """Manages the Streamlit user interface."""
     
     def __init__(self, config: Config):
         self.config = config
         st.set_page_config(
-            page_title="Airport Tariff Analysis System",
-            page_icon="✈️",
+            page_title="Tride Mobility Airport Tariff Analysis System",
             layout="wide"
         )
-        
+    
     def render(self):
         """Render the main UI."""
-        st.title("✈️ Airport Tariff Analysis System")
+        # Hide Streamlit's default elements
+        hide_streamlit_style = """
+            <style>
+                #MainMenu {visibility: hidden;}
+                footer {visibility: hidden;}
+                .stDeployButton {display: none;}
+            </style>
+        """
+        st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+        
+        # Render custom header with images
+        # Render custom header with images
+        st.markdown(
+        """
+        <div style="display: flex; align-items: center;">
+            <img src="https://raw.githubusercontent.com/DNAdithya/Tride_ML_Models/main/tride_logo.png" 
+             style="width: 100px; margin-right: 20px;" alt="Tride Logo">
+            <img src="https://raw.githubusercontent.com/DNAdithya/Tride_ML_Models/main/gmr_logo.png" 
+             style="width: 100px;" alt="GMR Logo">
+        </div>
+        """,
+        unsafe_allow_html=True
+        )
+
+        
+        st.title("Tride Mobility Airport Tariff Analysis System")
         st.markdown("""
         ### Compare and analyze tariffs across different airports
+        
         System automatically processes PDF documents from the data directory to analyze:
         - Fee structures and calculations
         - Cross-airport comparisons
         - Seasonal variations
         - Regulatory compliance
         """)
-
+        
         with st.sidebar:
             st.header("Available Documents")
             # Display PDF files from data directory
             pdf_files = DocumentProcessor(self.config).get_pdf_files()
+            
             if pdf_files:
                 st.markdown("### Processed Documents")
                 for path in pdf_files:
