@@ -320,7 +320,7 @@ class UI:
             st.markdown("### Sample Questions")
             st.markdown("""
             - How does base airport charges varies between Hyderabad and Delhi ?
-            - what is the aeronautical tax  of the three aiports ?
+            - what is the operating expenses  of the three aiports ?
             - what is the traffic forecast  of the three aiports ?
             """)
 
