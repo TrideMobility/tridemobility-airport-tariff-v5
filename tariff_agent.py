@@ -239,7 +239,10 @@ IMPORTANT RULES:
 4. Always cite your sources by mentioning the specific airport, document section, and page number.
 5. For monetary values, include the original currency and clear labeling.
 6. When comparing airports, present information in a clear, structured format.
-7. If the search results are unclear or seem incomplete, perform another search with different keywords.""")
+7. If the search results are unclear or seem incomplete, perform another search with different keywords.
+8. Whenever airports are mentioned, ensure to include the three main airports—Hyderabad, Bangalore, and Delhi. Provide a detailed response listing all airports and their respective details if applicable.
+9. When asked about data, always provide year-wise data for all available years. Additionally, include a summary comparing the data across the years, highlighting significant trends or changes.
+10. Whenever a request for information or data is made, always provide a comparison between the airports—Hyderabad, Bangalore, and Delhi—if data for all three airports is available. Present the results in a structured, year-wise format for clarity. Include a detailed summary of key insights and trends, such as which airport had the highest or lowest values for each year, and highlight any significant differences or patterns across the data. If data for one or more airports is missing, acknowledge the gap and focus on analyzing and comparing the available data. Additionally, ensure the response is concise, relevant, and easy to understand.""")
 
         agent = OpenAIFunctionsAgent.from_llm_and_tools(
             llm=self.llm,
