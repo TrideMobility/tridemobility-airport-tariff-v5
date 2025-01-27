@@ -319,9 +319,9 @@ class UI:
             
             st.markdown("### Sample Questions")
             st.markdown("""
-            - How does base airport charges varies between Hyderabad and Delhi ?
-            - what is the operating expenses of the delhi and hyderbad airports  ?
-            - what is the traffic forecast  of the three aiports ?
+            - What are the landing charges for a 100-ton aircraft?
+            - Compare parking charges between airports
+            - What are the peak hour surcharges?
             """)
 
 def main():
