@@ -290,8 +290,6 @@ class UI:
         <div style="display: flex; align-items: center;">
             <img src="https://raw.githubusercontent.com/DNAdithya/Tride_ML_Models/main/tride_logo.png" 
              style="width: 100px; margin-right: 20px;" alt="Tride Logo">
-            <img src="https://raw.githubusercontent.com/DNAdithya/Tride_ML_Models/main/gmr_logo.png" 
-             style="width: 100px;" alt="GMR Logo">
         </div>
         """,
         unsafe_allow_html=True
